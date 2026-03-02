@@ -96,6 +96,12 @@ target ffi.o pkg : FilePath := do
     let compiler := if Platform.isWindows then "cc" else "clang"
     buildO (compiler := compiler) oFile srcJob flags
 
+extern_lib cvc5Ffi pkg := do
+  let name := nameToStaticLib "cvc5Ffi"
+  let ffiO ← fetch <| pkg.target ``ffi.o
+  -- buildStaticLib (pkg.nativeLibDir / name) #[ffiO]
+  buildStaticLib (pkg.sharedLibDir / name) #[ffiO]
+
 input_file libcadical where
   path := s!"cvc5-{cvc5.target}" / "lib" / nameToStaticLib "cadical" true
 
