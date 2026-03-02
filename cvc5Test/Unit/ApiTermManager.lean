@@ -183,17 +183,17 @@ test![TestApiBlackTermManager, mkDatatypeSorts] tm => do
   let mut dt0Spec ← tm.mkDatatypeDecl "dt0" #[p0]
   let mut dt1Spec ← tm.mkDatatypeDecl "dt1" #[p1]
   let mut ctor0Spec ← tm.mkDatatypeConstructorDecl "c0"
-  ctor0Spec ← u1.instantiate #[p0] >>= ctor0Spec.addSelector "s0"
+  ctor0Spec ← ctor0Spec.addSelector "s0" (← u1.instantiate #[p0])
   let mut ctor1Spec ← tm.mkDatatypeConstructorDecl "c1"
-  ctor1Spec ← u0.instantiate #[p1] >>= ctor1Spec.addSelector "s1"
+  ctor1Spec ← ctor1Spec.addSelector "s1" (← u0.instantiate #[p1])
   dt0Spec ← dt0Spec.addConstructor ctor0Spec
   dt1Spec ← dt1Spec.addConstructor ctor1Spec
-  dt1Spec ← tm.mkDatatypeConstructorDecl "nil" >>= dt1Spec.addConstructor
+  dt1Spec ← dt1Spec.addConstructor (← tm.mkDatatypeConstructorDecl "nil")
   let dtSorts ← tm.mkDatatypeSorts #[dt0Spec, dt1Spec]
   let isort1 ← dtSorts[1]!.instantiate #[bool]
   let t1 ← tm.mkConst isort1 "t"
   let t0 ← do
-    let selector ← t1.getSort.getDatatype!.getSelector "s1" >>= DatatypeSelector.getTerm
+    let selector ← DatatypeSelector.getTerm (← t1.getSort.getDatatype!.getSelector "s1")
     tm.mkTerm Kind.APPLY_SELECTOR #[selector, t1]
   assertEq t0.getSort (dtSorts[0]!.instantiate! #[bool])
 
@@ -613,3 +613,455 @@ test![TestApiBlackTermManager, mkFloatingPointPosInf] tm => do
 
 test![TestApiBlackTermManager, mkFloatingPointPosZero] tm => do
   tm.mkFloatingPointPosZero 3 5 |> assertOkDiscard
+  tm.mkFloatingPointPosZero 3 5 |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkOp] tm => do
+  -- mkOpOfString
+  tm.mkOpOfString Kind.DIVISIBLE "2147483648" |> assertOkDiscard
+  tm.mkOpOfString Kind.BITVECTOR_EXTRACT "asdf" |> assertError
+    "invalid kind 'BITVECTOR_EXTRACT', expected DIVISIBLE"
+
+  -- mkOp
+  tm.mkOp Kind.DIVISIBLE #[1] |> assertOkDiscard
+  tm.mkOp Kind.BITVECTOR_ROTATE_LEFT #[1] |> assertOkDiscard
+  tm.mkOp Kind.BITVECTOR_ROTATE_RIGHT #[1] |> assertOkDiscard
+  tm.mkOp Kind.BITVECTOR_EXTRACT #[1] |> assertError
+    "invalid number of indices for operator BITVECTOR_EXTRACT, expected 2 but got 1."
+
+  tm.mkOp Kind.BITVECTOR_EXTRACT #[1, 1] |> assertOkDiscard
+  tm.mkOp Kind.DIVISIBLE #[1, 2] |> assertError
+    "invalid number of indices for operator DIVISIBLE, expected 1 but got 2."
+
+  tm.mkOp Kind.TUPLE_PROJECT #[1, 2, 2] |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkPi] tm => do
+  tm.mkPi |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkInteger] tm => do
+  tm.mkIntegerOfString "123" |> assertOkDiscard
+  tm.mkIntegerOfString "1.23" |> assertError
+    "invalid argument '1.23' for 's', expected an integer "
+  tm.mkIntegerOfString "1/23" |> assertError
+    "invalid argument '1/23' for 's', expected an integer "
+  tm.mkIntegerOfString "12/3" |> assertError
+    "invalid argument '12/3' for 's', expected an integer "
+  tm.mkIntegerOfString ".2" |> assertError "invalid argument '.2' for 's', expected an integer "
+  tm.mkIntegerOfString "2." |> assertError "invalid argument '2.' for 's', expected an integer "
+  tm.mkIntegerOfString "" |> assertError "invalid argument '' for 's', expected an integer "
+  tm.mkIntegerOfString "asdf" |> assertError
+    "invalid argument 'asdf' for 's', expected an integer "
+  tm.mkIntegerOfString "1.2/3" |> assertError
+    "invalid argument '1.2/3' for 's', expected an integer "
+  tm.mkIntegerOfString "." |> assertError "invalid argument '.' for 's', expected an integer "
+  tm.mkIntegerOfString "/" |> assertError "invalid argument '/' for 's', expected an integer "
+  tm.mkIntegerOfString "2/" |> assertError "invalid argument '2/' for 's', expected an integer "
+  tm.mkIntegerOfString "/2" |> assertError "invalid argument '/2' for 's', expected an integer "
+
+  tm.mkInteger 1 |> assertOkDiscard
+  tm.mkInteger (- 1) |> assertOkDiscard
+  -- not in the original test
+  tm.mkInteger 0 |> assertOkDiscard
+  tm.mkInteger (- 123456789101112131415) |> assertOkDiscard
+  tm.mkInteger 123456789101112131415 |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkReal] tm => do
+  tm.mkRealOfString "123" |> assertOkDiscard
+  tm.mkRealOfString "1.23" |> assertOkDiscard
+  tm.mkRealOfString "1/23" |> assertOkDiscard
+  tm.mkRealOfString "12/3" |> assertOkDiscard
+  tm.mkRealOfString ".2" |> assertOkDiscard
+  tm.mkRealOfString "2." |> assertOkDiscard
+  tm.mkRealOfString "" |> assertError "cannot construct Real or Int from string argument ''"
+  tm.mkRealOfString "asdf" |> assertError
+    "cannot construct Real or Int from string argument 'asdf'"
+  tm.mkRealOfString "1.2/3" |> assertError
+    "cannot construct Real or Int from string argument '1.2/3'"
+  tm.mkRealOfString "." |> assertError
+    "invalid argument '.' for 's', expected a string representing a real or rational value."
+  tm.mkRealOfString "/" |> assertError "cannot construct Real or Int from string argument '/'"
+  tm.mkRealOfString "2/" |> assertError "cannot construct Real or Int from string argument '2/'"
+  tm.mkRealOfString "/2" |> assertError "cannot construct Real or Int from string argument '/2'"
+
+  -- the original test has more values to test different (u)int encodings, but we only accept `Int`
+  -- numerical values
+  let val1 : Int := 1
+  let val2 := - 1
+  tm.mkReal val1 |> assertOkDiscard
+  tm.mkReal val2 |> assertOkDiscard
+  tm.mkReal val2 |> assertOkDiscard
+  tm.mkReal val1 val1 |> assertOkDiscard
+  tm.mkReal val2 val2 |> assertOkDiscard
+  tm.mkRealOfString "-1/-1" |> assertOkDiscard
+  tm.mkRealOfString "1/-1" |> assertOkDiscard
+  tm.mkRealOfString "-1/1" |> assertOkDiscard
+  tm.mkRealOfString "1/1" |> assertOkDiscard
+  tm.mkRealOfString "/-5" |> assertError "cannot construct Real or Int from string argument '/-5'"
+  -- the original test checks that division by zero (`Int`) fails, but we ask for a proof that this
+  -- can't happen
+  tm.mkRealOfString "1/0" |> assertError "cannot construct Real or Int from string argument '1/0'"
+
+  -- not in the original test
+  tm.mkRealOfRat (mkRat val1 1) |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkRegexpAll] tm => do
+  let strSort ← tm.getStringSort
+  let s ← tm.mkConst strSort "s"
+  tm.mkTerm Kind.STRING_IN_REGEXP #[s, ← tm.mkRegexpAll] |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkRegexpAllchar] tm => do
+  let strSort ← tm.getStringSort
+  let s ← tm.mkConst strSort "s"
+  tm.mkTerm Kind.STRING_IN_REGEXP #[s, ← tm.mkRegexpAllchar] |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkRegexpNone] tm => do
+  let strSort ← tm.getStringSort
+  let s ← tm.mkConst strSort "s"
+  tm.mkTerm Kind.STRING_IN_REGEXP #[s, ← tm.mkRegexpNone] |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkSepEmp] tm => do
+  tm.mkSepEmp |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkSepNil] tm => do
+  tm.mkSepNil (← tm.getBooleanSort) |> assertOkDiscard
+  tm.mkSepNil (Sort.null ()) |> assertError "invalid null argument for 'sort'"
+  tm.mkSepNil (← tm.getIntegerSort) |> assertOkDiscard
+  let tm' ← TermManager.new
+  tm'.mkSepNil (← tm.getBooleanSort) |> assertError
+    "Given sort is not associated with this term manager"
+
+test![TestApiBlackTermManager, mkString] tm => do
+  tm.mkString "" |> assertOkDiscard
+  tm.mkString "asdfasdf" |> assertOkDiscard
+  assertEq "\"asdf\\u{5c}nasdf\"" (← tm.mkString "asdf\\nasdf").toString
+  assertEq "\"asdf\\u{5c}nasdf\"" (← tm.mkString "asdf\u005cnasdf").toString
+
+  let strings := ["", "ascii text", "utf8 → π ←"]
+  for s in strings do
+    assertEq (← (← tm.mkString s).getStringValue) s
+
+test![TestApiBlackTermManager, mkTerm] tm => do
+  let bv32Sort ← tm.mkBitVectorSort 32
+  let a ← tm.mkConst bv32Sort "a"
+  let b ← tm.mkConst bv32Sort "b"
+  let v1 := #[a, b]
+  let v2 := #[a, Term.null ()]
+  let v3 := #[a, ← tm.mkTrue]
+  let _v4 := #[← tm.mkInteger 1, ← tm.mkInteger 2]
+  let _v5 := #[← tm.mkInteger 1, Term.null ()]
+  let v6 := #[]
+
+  tm.mkTerm Kind.PI |> assertOkDiscard
+  tm.mkTerm Kind.PI v6 |> assertOkDiscard
+  tm.mkTermOfOp (← tm.mkOp Kind.PI) |> assertOkDiscard
+  tm.mkTermOfOp (← tm.mkOp Kind.PI) v6 |> assertOkDiscard
+  tm.mkTerm Kind.REGEXP_NONE |> assertOkDiscard
+  tm.mkTerm Kind.REGEXP_NONE v6 |> assertOkDiscard
+  tm.mkTermOfOp (← tm.mkOp Kind.REGEXP_NONE) |> assertOkDiscard
+  tm.mkTermOfOp (← tm.mkOp Kind.REGEXP_NONE) v6 |> assertOkDiscard
+  tm.mkTerm Kind.REGEXP_ALLCHAR |> assertOkDiscard
+  tm.mkTerm Kind.REGEXP_ALLCHAR v6 |> assertOkDiscard
+  tm.mkTermOfOp (← tm.mkOp Kind.REGEXP_ALLCHAR) |> assertOkDiscard
+  tm.mkTermOfOp (← tm.mkOp Kind.REGEXP_ALLCHAR) v6 |> assertOkDiscard
+  tm.mkTerm Kind.SEP_EMP |> assertOkDiscard
+  tm.mkTerm Kind.SEP_EMP v6 |> assertOkDiscard
+  tm.mkTermOfOp (← tm.mkOp Kind.SEP_EMP) |> assertOkDiscard
+  tm.mkTermOfOp (← tm.mkOp Kind.SEP_EMP) v6 |> assertOkDiscard
+  tm.mkTerm Kind.CONST_BITVECTOR |> assertError
+    "invalid kind 'CONST_BITVECTOR', \
+    expected PI, REGEXP_NONE, REGEXP_ALL, REGEXP_ALLCHAR or SEP_EMP"
+
+  tm.mkTerm Kind.NOT #[← tm.mkTrue] |> assertOkDiscard
+  tm.mkTerm Kind.BAG_MAKE #[← tm.mkTrue, ← tm.mkInteger 1] |> assertOkDiscard
+  tm.mkTerm Kind.NOT #[Term.null ()] |> assertError
+    "invalid null term in 'children' at index 0"
+  tm.mkTerm Kind.NOT #[a] |> assertError "expecting a Boolean subexpression"
+  tm.mkTerm Kind.NOT #[← tm.mkTrue] |> assertOkDiscard
+
+  tm.mkTerm Kind.EQUAL #[a, b] |> assertOkDiscard
+  tm.mkTerm Kind.EQUAL #[Term.null (), b] |> assertError
+    "invalid null term in 'children' at index 0"
+  tm.mkTerm Kind.EQUAL #[a, Term.null ()] |> assertError
+    "invalid null term in 'children' at index 1"
+  tm.mkTerm Kind.EQUAL #[a, ← tm.mkTrue] |> assertError
+    "Subexpressions must have the same type:\n\
+    Equation: (= a true)\nType 1: (_ BitVec 32)\nType 2: Bool"
+  tm.mkTerm Kind.EQUAL #[a, b] |> assertOkDiscard
+
+  tm.mkTerm Kind.ITE #[← tm.mkTrue, ← tm.mkTrue, ← tm.mkTrue] |> assertOkDiscard
+  tm.mkTerm Kind.ITE #[Term.null (), ← tm.mkTrue, ← tm.mkTrue] |> assertError
+    "invalid null term in 'children' at index 0"
+  tm.mkTerm Kind.ITE #[← tm.mkTrue, Term.null (), ← tm.mkTrue] |> assertError
+    "invalid null term in 'children' at index 1"
+  tm.mkTerm Kind.ITE #[← tm.mkTrue, ← tm.mkTrue, Term.null ()] |> assertError
+    "invalid null term in 'children' at index 2"
+  tm.mkTerm Kind.ITE #[← tm.mkTrue, ← tm.mkTrue, b] |> assertError
+    "Branches of the ITE must have comparable type.\n\
+    then branch: true\nits type   : Bool\nelse branch: b\nits type   : (_ BitVec 32)"
+  tm.mkTerm Kind.ITE #[← tm.mkTrue, ← tm.mkTrue, ← tm.mkTrue] |> assertOkDiscard
+
+  tm.mkTerm Kind.EQUAL v1 |> assertOkDiscard
+  tm.mkTerm Kind.EQUAL v2 |> assertError "invalid null term in 'children' at index 1"
+  tm.mkTerm Kind.EQUAL v3 |> assertError
+    "Subexpressions must have the same type:\n\
+    Equation: (= a true)\nType 1: (_ BitVec 32)\nType 2: Bool"
+  tm.mkTerm Kind.DISTINCT v6 |> assertError
+    "invalid kind 'DISTINCT', expected PI, REGEXP_NONE, REGEXP_ALL, REGEXP_ALLCHAR or SEP_EMP"
+
+  -- test cases that are nary via the API but but have arity = 2 internally
+  let _scope ← do
+    let sBool ← tm.getBooleanSort
+    let tBool ← tm.mkConst sBool "tBool"
+    tm.mkTerm Kind.IMPLIES #[tBool, tBool, tBool] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.IMPLIES) #[tBool, tBool, tBool] |> assertOkDiscard
+    tm.mkTerm Kind.XOR #[tBool, tBool, tBool] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.XOR) #[tBool, tBool, tBool] |> assertOkDiscard
+    let tInt ← tm.mkConst (← tm.getIntegerSort) "tInt"
+    tm.mkTerm Kind.DIVISION #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.DIVISION) #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTerm Kind.INTS_DIVISION #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.INTS_DIVISION) #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTerm Kind.SUB #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.SUB) #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTerm Kind.EQUAL #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.EQUAL) #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTerm Kind.LT #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.LT) #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTerm Kind.GT #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.GT) #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTerm Kind.LEQ #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.LEQ) #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTerm Kind.GEQ #[tInt, tInt, tInt] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.GEQ) #[tInt, tInt, tInt] |> assertOkDiscard
+    let tReg ← tm.mkConst (← tm.getRegExpSort) "tReg"
+    tm.mkTerm Kind.REGEXP_DIFF #[tReg, tReg, tReg] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.REGEXP_DIFF) #[tReg, tReg, tReg] |> assertOkDiscard
+    let tFun ← tm.mkConst (← tm.mkFunctionSort #[sBool, sBool, sBool] sBool)
+    tm.mkTerm Kind.HO_APPLY #[tFun, tBool, tBool, tBool] |> assertOkDiscard
+    tm.mkTermOfOp (← tm.mkOp Kind.HO_APPLY) #[tFun, tBool, tBool, tBool] |> assertOkDiscard
+
+  let tm' ← TermManager.new
+  tm.mkTerm Kind.ITE #[← tm.mkTrue, ← tm'.mkTrue, ← tm'.mkTrue] |> assertError
+    "invalid term in 'children' at index 1, expected a term associated with this term manager"
+  tm.mkTerm Kind.ITE #[← tm'.mkTrue, ← tm.mkTrue, ← tm'.mkTrue] |> assertError
+    "invalid term in 'children' at index 0, expected a term associated with this term manager"
+  tm.mkTerm Kind.ITE #[← tm'.mkTrue, ← tm'.mkTrue, ← tm.mkTrue] |> assertError
+    "invalid term in 'children' at index 0, expected a term associated with this term manager"
+
+test![TestApiBlackTermManager, mkTermOfOp] tm => do
+  let bv32Sort ← tm.mkBitVectorSort 32
+  let a ← tm.mkConst bv32Sort "a"
+  let b ← tm.mkConst bv32Sort "b"
+  let v1 := #[← tm.mkInteger 1, ← tm.mkInteger 2]
+  let v2 := #[← tm.mkInteger 1, Term.null ()]
+  let v3 := #[]
+  let v4 := #[← tm.mkInteger 5]
+
+  -- simple operator terms
+  let opTerm1 ← tm.mkOp Kind.BITVECTOR_EXTRACT #[2, 1]
+  let opTerm2 ← tm.mkOp Kind.DIVISIBLE #[1]
+
+  -- list datatype
+  let sort ← tm.mkParamSort "T"
+  let mut listSpec ← tm.mkDatatypeDecl "paramList" #[sort]
+  let mut consSpec ← tm.mkDatatypeConstructorDecl "cons"
+  let nilSpec ← tm.mkDatatypeConstructorDecl "nil"
+  consSpec ← consSpec.addSelector "head" sort
+  consSpec ← consSpec.addSelectorSelf "tail"
+  listSpec ← listSpec.addConstructor consSpec
+  listSpec ← listSpec.addConstructor nilSpec
+  let listSort ← tm.mkDatatypeSort listSpec
+  let intListSort ← listSort.instantiate #[← tm.getIntegerSort]
+  let c ← tm.mkConst intListSort "c"
+  let list ← listSort.getDatatype
+
+  -- list datatype constructor and selector operator terms
+  let consTerm ← (← list.getConstructor "cons").getTerm
+  let nilTerm ← (← list.getConstructor "nil").getTerm
+  let headTerm ← (← list[0]!.getSelector "head").getTerm
+  let tailTerm ← list[0]![1]!.getTerm
+
+  let _scope ← do
+    tm.mkTerm Kind.APPLY_CONSTRUCTOR #[nilTerm] |> assertOkDiscard
+    tm.mkTerm Kind.APPLY_SELECTOR #[nilTerm] |> assertError
+      "invalid kind 'APPLY_SELECTOR', \
+      expected Terms with kind APPLY_SELECTOR must have at least 2 children and at most 2 children \
+      (the one under construction has 1)"
+    tm.mkTerm Kind.APPLY_SELECTOR #[consTerm] |> assertError
+      "invalid kind 'APPLY_SELECTOR', \
+      expected Terms with kind APPLY_SELECTOR must have at least 2 children \
+      and at most 2 children (the one under construction has 1)"
+    tm.mkTerm Kind.APPLY_CONSTRUCTOR #[consTerm] |> assertError
+      "number of arguments does not match the constructor type"
+    tm.mkTermOfOp opTerm1 |> assertError
+      "invalid kind 'BITVECTOR_EXTRACT', \
+      expected Terms with kind BITVECTOR_EXTRACT must have at least 1 children \
+      and at most 1 children (the one under construction has 0)"
+    tm.mkTerm Kind.APPLY_SELECTOR #[headTerm] |> assertError
+      "invalid kind 'APPLY_SELECTOR', \
+      expected Terms with kind APPLY_SELECTOR must have at least 2 children \
+      and at most 2 children (the one under construction has 1)"
+    tm.mkTermOfOp opTerm1 |> assertError
+      "invalid kind 'BITVECTOR_EXTRACT', \
+      expected Terms with kind BITVECTOR_EXTRACT must have at least 1 children \
+      and at most 1 children (the one under construction has 0)"
+    tm.mkTerm Kind.APPLY_CONSTRUCTOR #[nilTerm] |> assertOkDiscard
+
+  let _scope ← do
+    tm.mkTermOfOp opTerm1 #[a] |> assertOkDiscard
+    tm.mkTermOfOp opTerm2 #[← tm.mkInteger 1] |> assertOkDiscard
+    tm.mkTerm Kind.APPLY_SELECTOR #[headTerm, c] |> assertOkDiscard
+    tm.mkTerm Kind.APPLY_SELECTOR #[tailTerm, c] |> assertOkDiscard
+    tm.mkTermOfOp opTerm2 #[a] |> assertError
+      "Expecting a integer term as the first argument in 'divisible'"
+    tm.mkTermOfOp opTerm1 #[Term.null ()] |> assertError
+      "invalid null term in 'children' at index 0"
+    tm.mkTerm Kind.APPLY_CONSTRUCTOR #[consTerm, ← tm.mkInteger 0] |> assertError
+      "number of arguments does not match the constructor type"
+    tm.mkTermOfOp opTerm1 #[a] |> assertOkDiscard
+
+  let _scope ← do
+    tm.mkTerm Kind.APPLY_CONSTRUCTOR
+      #[consTerm, ← tm.mkInteger 0, ← tm.mkTerm Kind.APPLY_CONSTRUCTOR #[nilTerm]]
+    |> assertOkDiscard
+    tm.mkTermOfOp opTerm2 #[← tm.mkInteger 1, ← tm.mkInteger 2] |> assertError
+      "invalid kind 'DIVISIBLE', \
+      expected Terms with kind DIVISIBLE must have at least 1 children \
+      and at most 1 children (the one under construction has 2)"
+    tm.mkTermOfOp opTerm1 #[a, b] |> assertError
+      "invalid kind 'BITVECTOR_EXTRACT', \
+      expected Terms with kind BITVECTOR_EXTRACT must have at least 1 children \
+      and at most 1 children (the one under construction has 2)"
+    tm.mkTermOfOp opTerm2 #[← tm.mkInteger 1, Term.null ()] |> assertError
+      "invalid null term in 'children' at index 1"
+    tm.mkTermOfOp opTerm2 #[Term.null (), ← tm.mkInteger 1] |> assertError
+      "invalid null term in 'children' at index 0"
+    tm.mkTerm Kind.APPLY_CONSTRUCTOR
+      #[consTerm, ← tm.mkInteger 0, ← tm.mkTerm Kind.APPLY_CONSTRUCTOR #[nilTerm]]
+    |> assertOkDiscard
+
+  tm.mkTermOfOp opTerm1 #[a, b, a] |> assertError
+    "invalid kind 'BITVECTOR_EXTRACT', \
+    expected Terms with kind BITVECTOR_EXTRACT must have at least 1 children \
+    and at most 1 children (the one under construction has 3)"
+  tm.mkTermOfOp opTerm2 #[← tm.mkInteger 1, ← tm.mkInteger 1, Term.null ()] |> assertError
+    "invalid null term in 'children' at index 2"
+
+  tm.mkTermOfOp opTerm2 v4 |> assertOkDiscard
+  tm.mkTermOfOp opTerm2 v1 |> assertError
+    "invalid kind 'DIVISIBLE', \
+    expected Terms with kind DIVISIBLE must have at least 1 children \
+    and at most 1 children (the one under construction has 2)"
+  tm.mkTermOfOp opTerm2 v2 |> assertError "invalid null term in 'children' at index 1"
+  tm.mkTermOfOp opTerm2 v3 |> assertError
+    "invalid kind 'DIVISIBLE', \
+    expected Terms with kind DIVISIBLE must have at least 1 children \
+    and at most 1 children (the one under construction has 0)"
+  tm.mkTermOfOp opTerm2 v4 |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkTrue] tm => do
+  tm.mkTrue |> assertOkDiscard
+  tm.mkTrue |> assertOkDiscard
+
+test![TestApiBlackTermManager, mkTuple] tm => do
+  tm.mkTuple #[← tm.mkBitVectorOfString 3 "101" 2] |> assertOkDiscard
+  tm.mkTuple #[← tm.mkInteger 5] |> assertOkDiscard
+  tm.mkTuple #[← tm.mkRealOfString "5.3"] |> assertOkDiscard
+  tm.mkTuple #[← tm.mkBitVectorOfString 3 "101" 2] |> assertOkDiscard
+  tm.mkTuple #[← tm.mkBitVectorOfString 3 "101" 2] |> assertOkDiscard
+
+  let tm' ← TermManager.new
+  tm'.mkTuple #[← tm.mkBitVectorOfString 3 "101" 2] |> assertError
+    "invalid term in 'terms' at index 0, expected a term associated with this term manager"
+
+test![TestApiBlackTermManager, mkNullableSome] tm => do
+  tm.mkNullableSome (← tm.mkBitVectorOfString 3 "101" 2) |> assertOkDiscard
+  tm.mkNullableSome (← tm.mkInteger 5) |> assertOkDiscard
+  tm.mkNullableSome (← tm.mkRealOfString "5.3") |> assertOkDiscard
+  tm.mkNullableSome (← tm.mkBitVectorOfString 3 "101" 2) |> assertOkDiscard
+  tm.mkNullableSome (← tm.mkBitVectorOfString 3 "101" 2) |> assertOkDiscard
+
+  let tm' ← TermManager.new
+  tm'.mkNullableSome (← tm.mkBitVectorOfString 3 "101" 2) |> assertError
+    "Given term is not associated with this term manager"
+
+test![TestApiBlackTermManager, mkNullableVal] tm => do
+  let mut value ← tm.mkNullableVal (← tm.mkNullableSome (← tm.mkInteger 5))
+  let solver ← Solver.new tm
+  value ← solver.simplify value
+  assertEq 5 value.getIntegerValue!
+
+  let tm' ← TermManager.new
+  tm'.mkNullableVal (← tm.mkNullableSome (← tm.mkBitVectorOfString 3 "101" 2)) |> assertError
+    "Given term is not associated with this term manager"
+
+test![TestApiBlackTermManager, mkNullableIsNull] tm => do
+  let mut value ← tm.mkNullableIsNull (← tm.mkNullableSome (← tm.mkInteger 5))
+  let solver ← Solver.new tm
+  value ← solver.simplify value
+  assertEq false value.getBooleanValue!
+
+  let tm' ← TermManager.new
+  tm'.mkNullableIsNull (← tm.mkNullableSome (← tm.mkBitVectorOfString 3 "101" 2)) |> assertError
+    "Given term is not associated with this term manager"
+
+test![TestApiBlackTermManager, mkNullableIsSome] tm => do
+  let mut value ← tm.mkNullableIsSome (← tm.mkNullableSome (← tm.mkInteger 5))
+  let solver ← Solver.new tm
+  value ← solver.simplify value
+  assertEq true value.getBooleanValue!
+
+  let tm' ← TermManager.new
+  tm'.mkNullableIsSome (← tm.mkNullableSome (← tm.mkBitVectorOfString 3 "101" 2)) |> assertError
+    "Given term is not associated with this term manager"
+
+test![TestApiBlackTermManager, mkNullableNull] tm => do
+  let nullableSort ← tm.mkNullableSort (← tm.getBooleanSort)
+  let nullableNull ← tm.mkNullableNull nullableSort
+  let mut value ← tm.mkNullableIsNull nullableNull
+  let solver ← Solver.new tm
+  value ← solver.simplify value
+  assertEq true value.getBooleanValue!
+
+  let tm' ← TermManager.new
+  tm'.mkNullableIsNull (← tm.mkNullableNull (← tm.mkNullableSort (← tm.getBooleanSort)))
+  |> assertError "Given term is not associated with this term manager"
+
+test![TestApiBlackTermManager, mkNullableLift] tm => do
+  let some1 ← tm.mkNullableSome (← tm.mkInteger 1)
+  let some2 ← tm.mkNullableSome (← tm.mkInteger 2)
+  let some3 ← tm.mkNullableLift Kind.ADD #[some1, some2]
+  let solver ← Solver.new tm
+  let three ← solver.simplify (← tm.mkNullableVal some3)
+  assertEq 3 three.getIntegerValue!
+
+  let tm' ← TermManager.new
+  tm'.mkNullableLift Kind.ADD
+    #[ (← tm.mkNullableSome (← tm.mkInteger 1)), (← tm.mkNullableSome (← tm.mkInteger 2)) ]
+  |> assertError
+    "invalid term in 'args' at index 0, expected a term associated with this term manager"
+
+test![TestApiBlackTermManager, mkUniverseSet] tm => do
+  tm.mkUniverseSet (← tm.getBooleanSort) |> assertOkDiscard
+  tm.mkUniverseSet (Sort.null ()) |> assertError "invalid null argument for 'sort'"
+  tm.mkUniverseSet (← tm.getBooleanSort) |> assertOkDiscard
+
+  let tm' ← TermManager.new
+  tm'.mkUniverseSet (← tm.getBooleanSort) |> assertError
+    "Given sort is not associated with this term manager"
+
+test![TestApiBlackTermManager, mkConst] tm => do
+  let boolSort ← tm.getBooleanSort
+  let intSort ← tm.getIntegerSort
+  let funSort ← tm.mkFunctionSort #[intSort] boolSort
+  tm.mkConst boolSort |> assertOkDiscard
+  tm.mkConst funSort |> assertOkDiscard
+  tm.mkConst boolSort "b" |> assertOkDiscard
+  tm.mkConst intSort "i" |> assertOkDiscard
+  tm.mkConst funSort "f" |> assertOkDiscard
+  tm.mkConst funSort "" |> assertOkDiscard
+  tm.mkConst (Sort.null ()) |> assertError "invalid null argument for 'sort'"
+  tm.mkConst (Sort.null ()) "a" |> assertError "invalid null argument for 'sort'"
+  tm.mkConst boolSort |> assertOkDiscard
+
+  let tm' ← TermManager.new
+  tm'.mkConst boolSort |> assertError "Given sort is not associated with this term manager"

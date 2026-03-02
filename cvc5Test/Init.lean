@@ -71,28 +71,20 @@ def assertError
   (code : Env α)
   (hint : String := "")
 : Env Unit :=
-  assertAnyError expected
-    code
-    (hint := hint)
-    fun
-    | .error err => do
-      if err.trimAscii == expected.trimAscii then
-        return ()
-      else
-        IO.eprintln s!"{Test.pref hint}expected cvc5 error `{expected}`, got cvc5 error `{err}`"
-        fail "test failed"
-    | .recoverable err => do
-        IO.eprintln s!"{Test.pref hint}expected error `{expected}`, got recoverable error `{err}`"
-        fail "test failed"
-    | .unsupported err => do
-        IO.eprintln s!"{Test.pref hint}expected error `{expected}`, got unsupported error `{err}`"
-        fail "test failed"
-    | .option err => do
-        IO.eprintln s!"{Test.pref hint}expected error `{expected}`, got option error `{err}`"
-        fail "test failed"
-    | .missingValue => do
-        IO.eprintln s!"{Test.pref hint}expected cvc5 error `{expected}`, got missing value error"
-        fail "test failed"
+  assertAnyError expected code (hint := hint) fun error => do
+    let expected := expected.trimAscii
+    let error := error.toString.trimAscii
+    if error != expected then
+      IO.eprintln s!"\
+{Test.pref hint}error-check failed
+```expected
+{expected}
+```
+```
+{error}
+```\
+      "
+      fail "error-check failed"
 
 end Test
 

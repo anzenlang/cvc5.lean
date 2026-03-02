@@ -67,6 +67,147 @@ lean_obj_res except_err(lean_obj_arg alpha, lean_obj_arg msg);
         lean_mk_string("cvc5's term manager raised an unexpected exception")); \
   }
 
+// # `string::u32` helpers
+
+inline char32_t decode_utf8(const char*& it, const char* end)
+{
+  if (it == end) throw std::runtime_error("unexpected end");
+
+  unsigned char lead = static_cast<unsigned char>(*it++);
+  char32_t cp = 0;
+
+  if (lead < 0x80)
+  {  // 1‑byte
+    cp = lead;
+  }
+  else if ((lead >> 5) == 0x6)
+  {  // 2‑byte
+    if (it == end) throw std::runtime_error("truncated UTF‑8");
+    unsigned char c = static_cast<unsigned char>(*it++);
+    if ((c >> 6) != 0x2) throw std::runtime_error("bad continuation");
+    cp = ((lead & 0x1F) << 6) | (c & 0x3F);
+  }
+  else if ((lead >> 4) == 0xE)
+  {  // 3‑byte
+    if (it + 1 >= end) throw std::runtime_error("truncated UTF‑8");
+    unsigned char c1 = static_cast<unsigned char>(*it++);
+    unsigned char c2 = static_cast<unsigned char>(*it++);
+    if ((c1 >> 6) != 0x2 || (c2 >> 6) != 0x2)
+      throw std::runtime_error("bad continuation");
+    cp = ((lead & 0x0F) << 12) | ((c1 & 0x3F) << 6) | (c2 & 0x3F);
+  }
+  else if ((lead >> 3) == 0x1E)
+  {  // 4‑byte
+    if (it + 2 >= end) throw std::runtime_error("truncated UTF‑8");
+    unsigned char c1 = static_cast<unsigned char>(*it++);
+    unsigned char c2 = static_cast<unsigned char>(*it++);
+    unsigned char c3 = static_cast<unsigned char>(*it++);
+    if ((c1 >> 6) != 0x2 || (c2 >> 6) != 0x2 || (c3 >> 6) != 0x2)
+      throw std::runtime_error("bad continuation");
+    cp = ((lead & 0x07) << 18) | ((c1 & 0x3F) << 12) | ((c2 & 0x3F) << 6)
+         | (c3 & 0x3F);
+  }
+  else
+  {
+    throw std::runtime_error("invalid UTF‑8 lead byte");
+  }
+
+  // basic validation (over‑long, surrogates, out‑of‑range)
+  if (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)
+      || (cp <= 0x7F && lead >= 0x80) || (cp <= 0x7FF && lead >= 0xE0)
+      || (cp <= 0xFFFF && lead >= 0xF0))
+    throw std::runtime_error("invalid UTF‑8 sequence");
+
+  return cp;
+}
+
+// format a code point as \uXXXX or \UXXXXXXXX (no iostreams)
+inline void append_escape(std::string& out, char32_t cp)
+{
+  char buf[12];  // big enough for "\UXXXXXXXX\0"
+  if (cp <= 0xFFFF)
+    std::snprintf(buf, sizeof(buf), "\\u%04X", static_cast<unsigned>(cp));
+  else
+    std::snprintf(buf, sizeof(buf), "\\U%08X", static_cast<unsigned>(cp));
+  out.append(buf);
+}
+
+// ------------------------------------------------------------------
+// Main routine: UTF‑8 C‑string → newly allocated escaped C‑string
+// ------------------------------------------------------------------
+char* utf8_to_escaped_cstr(const char* src)
+{
+  if (!src) return nullptr;
+
+  const char* it = src;
+  const char* end = src + std::strlen(src);
+
+  std::string tmp;
+  tmp.reserve(end - it);  // rough estimate
+
+  while (it < end)
+  {
+    char32_t cp = decode_utf8(it, end);
+    if (cp < 0x80)
+    {
+      tmp.push_back(static_cast<char>(cp));  // ASCII unchanged
+    }
+    else
+    {
+      append_escape(tmp, cp);  // non‑ASCII escaped
+    }
+  }
+
+  // Allocate a C‑string the caller must free (via delete[])
+  char* result = new char[tmp.size() + 1];
+  std::memcpy(result, tmp.c_str(), tmp.size() + 1);
+  return result;
+}
+
+// Encode a single Unicode code point (char32_t) as UTF‑8 bytes
+inline void encode_utf8(char32_t cp, std::string& out)
+{
+  if (cp <= 0x7F)
+  {
+    // 1‑byte sequence: 0xxxxxxx
+    out.push_back(static_cast<char>(cp));
+  }
+  else if (cp <= 0x7FF)
+  {
+    // 2‑byte sequence: 110xxxxx 10xxxxxx
+    out.push_back(static_cast<char>(0xC0 | ((cp >> 6) & 0x1F)));
+    out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+  }
+  else if (cp <= 0xFFFF)
+  {
+    // 3‑byte sequence: 1110xxxx 10xxxxxx 10xxxxxx
+    out.push_back(static_cast<char>(0xE0 | ((cp >> 12) & 0x0F)));
+    out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+    out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+  }
+  else if (cp <= 0x10FFFF)
+  {
+    // 4‑byte sequence: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+    out.push_back(static_cast<char>(0xF0 | ((cp >> 18) & 0x07)));
+    out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+    out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+    out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+  }
+  // Values > 0x10FFFF are invalid Unicode; we simply ignore them here.
+}
+
+// Converts std::u32string to a lean string
+lean_obj_res u32string_to_string(const std::u32string& src)
+{
+  std::string result;
+  result.reserve(src.size() * 4);  // worst‑case allocation
+  for (char32_t cp : src)
+  {
+    encode_utf8(cp, result);
+  }
+  return lean_mk_string(result.c_str());
+}
+
 // # `Env` constructors
 
 lean_obj_res env_pure(lean_obj_arg alpha, lean_obj_arg a, lean_obj_arg ioWorld);
@@ -1002,6 +1143,18 @@ LEAN_EXPORT lean_obj_res term_getIntegerValue(lean_obj_arg t)
   CVC5_LEAN_API_TRY_CATCH_EXCEPT_END;
 }
 
+LEAN_EXPORT uint8_t term_isStringValue(lean_obj_arg t)
+{
+  return bool_box(term_unbox(t)->isStringValue());
+}
+
+LEAN_EXPORT lean_obj_res term_getStringValue(lean_obj_arg t)
+{
+  CVC5_LEAN_API_TRY_CATCH_EXCEPT_BEGIN;
+  return except_ok(u32string_to_string(term_unbox(t)->getU32StringValue()));
+  CVC5_LEAN_API_TRY_CATCH_EXCEPT_END;
+}
+
 LEAN_EXPORT lean_obj_res l_mkRat(lean_obj_arg num, lean_obj_arg den);
 
 LEAN_EXPORT lean_obj_res term_getRationalValue(lean_obj_arg t)
@@ -1834,9 +1987,16 @@ LEAN_EXPORT lean_obj_res termManager_mkFalse(lean_obj_arg tm,
   CVC5_LEAN_API_TRY_CATCH_ENV_END(ioWorld);
 }
 
-LEAN_EXPORT lean_obj_res termManager_mkIntegerFromString(lean_obj_arg tm,
-                                                         lean_obj_arg val,
-                                                         lean_obj_arg ioWorld)
+LEAN_EXPORT lean_obj_res termManager_mkPi(lean_obj_arg tm, lean_obj_arg ioWorld)
+{
+  CVC5_LEAN_API_TRY_CATCH_ENV_BEGIN;
+  return env_val(term_box(new Term(mut_tm_unbox(tm)->mkPi())), ioWorld);
+  CVC5_LEAN_API_TRY_CATCH_ENV_END(ioWorld);
+}
+
+LEAN_EXPORT lean_obj_res termManager_mkIntegerOfString(lean_obj_arg tm,
+                                                       lean_obj_arg val,
+                                                       lean_obj_arg ioWorld)
 {
   CVC5_LEAN_API_TRY_CATCH_ENV_BEGIN;
   return env_val(
@@ -1845,9 +2005,9 @@ LEAN_EXPORT lean_obj_res termManager_mkIntegerFromString(lean_obj_arg tm,
   CVC5_LEAN_API_TRY_CATCH_ENV_END(ioWorld);
 }
 
-LEAN_EXPORT lean_obj_res termManager_mkRealFromString(lean_obj_arg tm,
-                                                      lean_obj_arg val,
-                                                      lean_obj_arg ioWorld)
+LEAN_EXPORT lean_obj_res termManager_mkRealOfString(lean_obj_arg tm,
+                                                    lean_obj_arg val,
+                                                    lean_obj_arg ioWorld)
 {
   CVC5_LEAN_API_TRY_CATCH_ENV_BEGIN;
   return env_val(
@@ -1924,12 +2084,11 @@ LEAN_EXPORT lean_obj_res termManager_mkSepNil(lean_obj_arg tm,
 
 LEAN_EXPORT lean_obj_res termManager_mkString(lean_obj_arg tm,
                                               lean_obj_arg s,
-                                              uint8_t useEscSequences,
                                               lean_obj_arg ioWorld)
 {
   CVC5_LEAN_API_TRY_CATCH_ENV_BEGIN;
   return env_val(term_box(new Term(mut_tm_unbox(tm)->mkString(
-                     lean_string_cstr(s), useEscSequences))),
+                     utf8_to_escaped_cstr(lean_string_cstr(s)), true))),
                  ioWorld);
   CVC5_LEAN_API_TRY_CATCH_ENV_END(ioWorld);
 }
@@ -2272,6 +2431,19 @@ LEAN_EXPORT lean_obj_res termManager_mkOpOfIndices(lean_obj_arg tm,
         lean_array_get(lean_usize_to_nat(0), args, lean_usize_to_nat(i))));
   }
   return env_val(op_box(new Op(mut_tm_unbox(tm)->mkOp(k, indices))), ioWorld);
+  CVC5_LEAN_API_TRY_CATCH_ENV_END(ioWorld);
+}
+
+LEAN_EXPORT lean_obj_res termManager_mkOpOfString(lean_obj_arg tm,
+                                                  uint16_t kind,
+                                                  lean_obj_arg arg,
+                                                  lean_obj_arg ioWorld)
+{
+  CVC5_LEAN_API_TRY_CATCH_ENV_BEGIN;
+  Kind k = static_cast<Kind>(static_cast<int32_t>(kind) - 2);
+  return env_val(
+      op_box(new Op(mut_tm_unbox(tm)->mkOp(k, lean_string_cstr(arg)))),
+      ioWorld);
   CVC5_LEAN_API_TRY_CATCH_ENV_END(ioWorld);
 }
 

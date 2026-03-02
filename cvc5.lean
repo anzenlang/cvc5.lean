@@ -5,582 +5,17 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Abdalrhman Mohamed, Adrien Champion
 -/
 
-import cvc5.Init
-import cvc5.Kind
-import cvc5.ProofRule
-import cvc5.SkolemId
-import cvc5.Types
+import cvc5.Basic
+import cvc5.Op
+import cvc5.Proof
+import cvc5.Sort
+import cvc5.Term
+import cvc5.TermManager
+import cvc5.Solver
 
-@[export prod_mk]
-private def mkProd := @Prod.mk
+
 
 namespace cvc5
-
-namespace Kind
-
-/-- Produces a string representation. -/
-@[extern "kind_toString"]
-protected opaque toString : Kind → String
-
-instance : ToString Kind := ⟨Kind.toString⟩
-
-/-- Produces a hash. -/
-@[extern "kind_hash"]
-protected opaque hash : Kind → UInt64
-
-instance : Hashable Kind := ⟨Kind.hash⟩
-
-end Kind
-
-namespace SortKind
-
-/-- Produces a string representation. -/
-@[extern "sortKind_toString"]
-protected opaque toString : SortKind → String
-
-instance : ToString SortKind := ⟨SortKind.toString⟩
-
-/-- Produces a hash. -/
-@[extern "sortKind_hash"]
-protected opaque hash : SortKind → UInt64
-
-instance : Hashable SortKind := ⟨SortKind.hash⟩
-
-end SortKind
-
-namespace ProofRule
-
-/-- Produces a string representation. -/
-@[extern "proofRule_toString"]
-protected opaque toString : ProofRule → String
-
-instance : ToString ProofRule := ⟨ProofRule.toString⟩
-
-/-- Produces a hash. -/
-@[extern "proofRule_hash"]
-protected opaque hash : ProofRule → UInt64
-
-instance : Hashable ProofRule := ⟨ProofRule.hash⟩
-
-end ProofRule
-
-namespace SkolemId
-
-/-- Produces a string representation. -/
-@[extern "skolemId_toString"]
-protected opaque toString : SkolemId → String
-
-instance : ToString SkolemId := ⟨SkolemId.toString⟩
-
-/-- Produces a hash. -/
-@[extern "skolemId_hash"]
-protected opaque hash : SkolemId → UInt64
-
-instance : Hashable SkolemId := ⟨SkolemId.hash⟩
-
-end SkolemId
-
-namespace ProofRewriteRule
-
-/-- Produces a string representation. -/
-@[extern "proofRewriteRule_toString"]
-protected opaque toString : ProofRewriteRule → String
-
-instance : ToString ProofRewriteRule := ⟨ProofRewriteRule.toString⟩
-
-/-- Produces a hash. -/
-@[extern "proofRewriteRule_hash"]
-protected opaque hash : ProofRewriteRule → UInt64
-
-instance : Hashable ProofRewriteRule := ⟨ProofRewriteRule.hash⟩
-
-end ProofRewriteRule
-
-namespace UnknownExplanation
-
-/-- Produces a string representation. -/
-@[extern "unknownExplanation_toString"]
-protected opaque toString : UnknownExplanation → String
-
-instance : ToString UnknownExplanation := ⟨UnknownExplanation.toString⟩
-
-/-- Produces a hash. -/
-@[extern "unknownExplanation_hash"]
-protected opaque hash : UnknownExplanation → UInt64
-
-instance : Hashable UnknownExplanation := ⟨UnknownExplanation.hash⟩
-
-end UnknownExplanation
-
-namespace RoundingMode
-
-/-- Produces a string representation. -/
-@[extern "roundingMode_toString"]
-protected opaque toString : RoundingMode → String
-
-instance : ToString RoundingMode := ⟨RoundingMode.toString⟩
-
-/-- Produces a hash. -/
-@[extern "roundingMode_hash"]
-protected opaque hash : RoundingMode → UInt64
-
-instance : Hashable RoundingMode := ⟨RoundingMode.hash⟩
-
-end RoundingMode
-
-namespace BlockModelsMode
-
-/-- Produces a string representation. -/
-@[extern "blockModelsMode_toString"]
-protected opaque toString : BlockModelsMode → String
-
-instance : ToString BlockModelsMode := ⟨BlockModelsMode.toString⟩
-
-/-- Produces a hash. -/
-@[extern "blockModelsMode_hash"]
-protected opaque hash : BlockModelsMode → UInt64
-
-instance : Hashable BlockModelsMode := ⟨BlockModelsMode.hash⟩
-
-end BlockModelsMode
-
-namespace LearnedLitType
-
-/-- Produces a string representation. -/
-@[extern "learnedLitType_toString"]
-protected opaque toString : LearnedLitType → String
-
-instance : ToString LearnedLitType := ⟨LearnedLitType.toString⟩
-
-/-- Produces a hash. -/
-@[extern "learnedLitType_hash"]
-protected opaque hash : LearnedLitType → UInt64
-
-instance : Hashable LearnedLitType := ⟨LearnedLitType.hash⟩
-
-end LearnedLitType
-
-namespace ProofComponent
-
-/-- Produces a string representation. -/
-@[extern "proofComponent_toString"]
-protected opaque toString : ProofComponent → String
-
-instance : ToString ProofComponent := ⟨ProofComponent.toString⟩
-
-/-- Produces a hash. -/
-@[extern "proofComponent_hash"]
-protected opaque hash : ProofComponent → UInt64
-
-instance : Hashable ProofComponent := ⟨ProofComponent.hash⟩
-
-end ProofComponent
-
-namespace ProofFormat
-
-/-- Produces a string representation. -/
-@[extern "proofFormat_toString"]
-protected opaque toString : ProofFormat → String
-
-instance : ToString ProofFormat := ⟨ProofFormat.toString⟩
-
-/-- Produces a hash. -/
-@[extern "proofFormat_hash"]
-protected opaque hash : ProofFormat → UInt64
-
-instance : Hashable ProofFormat := ⟨ProofFormat.hash⟩
-
-end ProofFormat
-
-namespace FindSynthTarget
-
-/-- Produces a string representation. -/
-@[extern "findSynthTarget_toString"]
-protected opaque toString : FindSynthTarget → String
-
-instance : ToString FindSynthTarget := ⟨FindSynthTarget.toString⟩
-
-/-- Produces a hash. -/
-@[extern "findSynthTarget_hash"]
-protected opaque hash : FindSynthTarget → UInt64
-
-instance : Hashable FindSynthTarget := ⟨FindSynthTarget.hash⟩
-
-end FindSynthTarget
-
-namespace InputLanguage
-
-/-- Produces a string representation. -/
-@[extern "inputLanguage_toString"]
-protected opaque toString : InputLanguage → String
-
-instance : ToString InputLanguage := ⟨InputLanguage.toString⟩
-
-/-- Produces a hash. -/
-@[extern "inputLanguage_hash"]
-protected opaque hash : InputLanguage → UInt64
-
-instance : Hashable InputLanguage := ⟨InputLanguage.hash⟩
-
-end InputLanguage
-
-private opaque ResultImpl : NonemptyType.{0}
-
-/-- Encapsulation of a three-valued solver result, with explanations. -/
-def Result : Type := ResultImpl.type
-
-instance Result.instNonemptyResult : Nonempty Result := ResultImpl.property
-
-private opaque SynthResultImpl : NonemptyType.{0}
-
-/-- Encapsulation of a three-valued solver result, with explanations. -/
-def SynthResult : Type := SynthResultImpl.type
-
-instance SynthResult.instNonemptySynthResult : Nonempty SynthResult := SynthResultImpl.property
-
-private opaque SortImpl : NonemptyType.{0}
-
-end cvc5
-
-/-- The sort of a cvc5 term. -/
-def cvc5.Sort : Type := cvc5.SortImpl.type
-
-namespace cvc5
-
-instance Sort.instNonemptySort : Nonempty cvc5.Sort := SortImpl.property
-
-private opaque OpImpl : NonemptyType.{0}
-
-/-- A cvc5 operator.
-
-An operator is a term that represents certain operators, instantiated with its required parameters,
-*e.g.*, a `Term` of kind `Kind.BITVECTOR_EXTRACT`.
--/
-def Op : Type := OpImpl.type
-
-instance Op.instNonemptyOp : Nonempty Op := OpImpl.property
-
-private opaque TermImpl : NonemptyType.{0}
-
-/-- A cvc5 term. -/
-def Term : Type := TermImpl.type
-
-instance Term.instNonemptyTerm : Nonempty Term := TermImpl.property
-
-private opaque ProofImpl : NonemptyType.{0}
-
-/-- A cvc5 proof.
-
-Proofs are trees and every proof object corresponds to the root step of a proof. The branches of the
-root step are the premises of the step.
--/
-def Proof : Type := ProofImpl.type
-
-instance Proof.instNonemptyProof : Nonempty Proof := ProofImpl.property
-
-/-- Error type. -/
-inductive Error where
-  | missingValue
-  | error (msg : String)
-  | recoverable (msg : String)
-  | unsupported (msg : String)
-  | option (msg : String)
-deriving Repr
-
-/-- Cvc5 environment monad transformer.
-
-Most monadic functions in this API use the non-transformer monad `cvc5.Env`, where `m := BaseIO`.
-
-When using an `EnvT m α`, do make sure `m` is such that `MonadLiftT BaseIO m` which gives
-`MonadLiftT Env (EnvT m)`.
--/
-abbrev EnvT (m : Type → Type) (α : Type) : Type :=
-  ExceptT Error m α
-
-/-- Cvc5 environment monad in `BaseIO`. -/
-abbrev Env (α : Type) := EnvT BaseIO α
-
-namespace EnvT
-
--- functions used by the underlying C++ layer
-section ffi variable [Monad m]
-
-@[export env_pure]
-private def env_pure (a : α) : Env α := return a
-
-@[export env_bool]
-private def env_bool (b : Bool) : Env Bool := return b
-
-@[export env_uint64]
-private def env_uint64 (u : UInt64) : Env UInt64 := return u
-
-@[export env_throw]
-private def env_throw (e : Error) : Env α := throw e
-
-@[export env_throw_string]
-private def env_throw_string (e : String) : Env α := throw <| (.error e)
-
-end ffi
-
-end EnvT
-
-namespace Error
-
-/-- String representation of an error. -/
-protected def toString : Error → String :=
-  toString ∘ repr
-
-/-- Panics on errors, otherwise yields the `ok` result. -/
-def unwrap! [Inhabited α] : Except Error α → α
-| .ok a => a
-| .error e => panic! e.toString
-
-instance : ToString Error :=
-  ⟨Error.toString⟩
-
-end Error
-
-private opaque TermManagerImpl : NonemptyType.{0}
-
-/-- Manager for cvc5 terms. -/
-def TermManager : Type := TermManagerImpl.type
-
-namespace TermManager
-
-instance : Nonempty TermManager := TermManagerImpl.property
-
-/-- Constructor. -/
-extern_def new : Env TermManager
-
-end TermManager
-
-private opaque SolverImpl : NonemptyType.{0}
-
-/-- A cvc5 solver. -/
-def Solver : Type := SolverImpl.type
-
-namespace Solver
-
-instance : Nonempty Solver := SolverImpl.property
-
-/-- Constructor.
-
-- `tm` The associated term manager instance.
--/
-extern_def new : (tm : TermManager) → Env Solver
-
-end Solver
-
-private opaque DatatypeConstructorDeclImpl : NonemptyType.{0}
-
-/-- A cvc5 datatype constructor declaration.
-
-A datatype constructor declaration is a specification used for creating a datatype constructor.
--/
-def DatatypeConstructorDecl : Type := DatatypeConstructorDeclImpl.type
-
-namespace DatatypeConstructorDecl
-
-instance : Nonempty DatatypeConstructorDecl := DatatypeConstructorDeclImpl.property
-
-/-- A string representation of this datatype constructor declaration. -/
-protected extern_def toString : DatatypeConstructorDecl → String
-
-instance : ToString DatatypeConstructorDecl := ⟨DatatypeConstructorDecl.toString⟩
-
-end DatatypeConstructorDecl
-
-private opaque DatatypeDeclImpl : NonemptyType.{0}
-
-/-- A cvc5 datatype declaration.
-
-A datatype declaration is not itself a datatype (see `Datatype`), but a specification for creating a
-datatype sort.
-
-The interface for a datatype declaration coincides with the syntax for the SMT-LIB 2.6 command
-`declare-datatype`, or a single datatype within the `declare-datatypes` command.
-
-`Datatype` sorts can be constructed from a `DatatypeDecl` using:
-- `Solver.mkDatatypeSort`
-- `Solver.mkDatatypeSorts`
--/
-def DatatypeDecl : Type := DatatypeDeclImpl.type
-
-namespace DatatypeDecl
-
-instance : Nonempty DatatypeDecl := DatatypeDeclImpl.property
-
-/-- Get a string representation of this datatype declaration. -/
-protected extern_def toString : DatatypeDecl → String
-
-instance : ToString DatatypeDecl := ⟨DatatypeDecl.toString⟩
-
-end DatatypeDecl
-
-private opaque DatatypeSelectorImpl : NonemptyType.{0}
-
-/-- A cvc5 datatype selector. -/
-def DatatypeSelector : Type := DatatypeSelectorImpl.type
-
-namespace DatatypeSelector
-
-instance : Nonempty DatatypeSelector := DatatypeSelectorImpl.property
-
-/-- Gte the string representation of this datatype selector. -/
-protected extern_def toString : DatatypeSelector → String
-
-instance : ToString DatatypeSelector := ⟨DatatypeSelector.toString⟩
-
-end DatatypeSelector
-
-private opaque DatatypeConstructorImpl : NonemptyType.{0}
-
-/-- A cvc5 datatype constructor. -/
-def DatatypeConstructor : Type := DatatypeConstructorImpl.type
-
-namespace DatatypeConstructor
-
-instance : Nonempty DatatypeConstructor := DatatypeConstructorImpl.property
-
-/-- A string representation of this datatype. -/
-protected extern_def toString : DatatypeConstructor → String
-
-instance : ToString DatatypeConstructor := ⟨DatatypeConstructor.toString⟩
-
-end DatatypeConstructor
-
-private opaque DatatypeImpl : NonemptyType.{0}
-
-/-- A cvc5 datatype. -/
-def Datatype : Type := DatatypeImpl.type
-
-namespace Datatype
-
-instance : Nonempty Datatype := DatatypeImpl.property
-
-/-- A string representation of this datatype. -/
-protected extern_def toString : Datatype → String
-
-instance : ToString Datatype := ⟨Datatype.toString⟩
-
-end Datatype
-
-private opaque GrammarImpl : NonemptyType.{0}
-
-/-- A Sygus Grammar.
-
-This class can be used to define a context-free grammar of terms. Its interface coincides with the
-definition of grammars in the SyGuS IF 2.1 standard.
--/
-def Grammar : Type := GrammarImpl.type
-
-namespace Grammar
-
-instance : Nonempty Grammar := GrammarImpl.property
-
-/-- A string representation of this grammar. -/
-protected extern_def toString : Grammar → String
-
-instance : ToString Grammar := ⟨Grammar.toString⟩
-
-end Grammar
-
-private opaque CommandImpl : NonemptyType.{0}
-
-/-- Encapsulation of a command.
-
-Commands are constructed by the `InputParser` and can be invoked on the `Solver` and
-`Command`.
--/
-def Command : Type := CommandImpl.type
-
-namespace Command
-
-instance : Nonempty Command := CommandImpl.property
-
-/-- Get a string representation of this command. -/
-protected extern_def toString : Command → String
-
-instance : ToString Command := ⟨Command.toString⟩
-
-end Command
-
-private opaque SymbolManagerImpl : NonemptyType.{0}
-
-/-- Symbol manager.
-
-Internally, this class manages a symbol table and other meta-information pertaining to SMT2 file
-inputs (*e.g.* named assertions, declared functions, *etc.*).
-
-A symbol manager can be modified by invoking commands, see `Command.invoke`.
-
-A symbol manager can be provided when constructing an `InputParser`, in which case that
-`InputParser` has symbols of this symbol manager preloaded.
-
-The symbol manager's interface is otherwise not publicly available.
--/
-def SymbolManager : Type := SymbolManagerImpl.type
-
-namespace SymbolManager
-
-instance SymbolManager.instNonempty : Nonempty SymbolManager := SymbolManagerImpl.property
-
-/-- Constructor.
-
-- `tm` The associated term manager instance.
--/
-extern_def new : (tm : TermManager) → Env SymbolManager
-
-end SymbolManager
-
-private opaque InputParserImpl : NonemptyType.{0}
-
-/-- This type is the main interface for retrieving commands and expressions from an input using a
-  parser.
-
-After construction, it is expected that an input is first configured via, e.g.,
-`InputParser.setFileInput`, `InputParser.setStreamInput`, `InputParser.setStringInput` or
-`InputParser.setIncrementalStringInput` and `InputParser.appendIncrementalStringInput`. Then,
-functions `InputParser.nextCommand` and `InputParser.nextExpression` can be invoked to parse the
-input.
-
-The input parser interacts with a symbol manager, which determines which symbols are defined in the
-current context, based on the background logic and user-defined symbols. If no symbol manager is
-provided, then the input parser will construct (an initially empty) one.
-
-If provided, the symbol manager must have a logic that is compatible with the provided solver. That
-is, if both the solver and symbol manager have their logics set (`SymbolManager.isLogicSet` and
-`Solver.isLogicSet`), then their logics must be the same.
-
-Upon setting an input source, if either the solver (resp. symbol manager) has its logic set, then
-the symbol manager (resp. solver) is set to use that logic, if its logic is not already set.
--/
-def InputParser : Type := InputParserImpl.type
-
-namespace InputParser
-
-instance : Nonempty InputParser := InputParserImpl.property
-
-/-- Construct an input parser with an initially empty symbol manager.
-
-- `solver`: The solver (e.g. for constructing terms and sorts).
--/
-private extern_def ofSolver : (solver : Solver) → Env InputParser
-
-/-- Construct an input parser.
-
-- `solver` The solver (e.g. for constructing terms and sorts).
-- `sm` The symbol manager, which contains a symbol table that maps symbols to terms and sorts. Must
-  have a logic that is compatible with the solver.
--/
-private extern_def ofSolverAndSM : (solver : Solver) → (sm : SymbolManager) → Env InputParser
-
-@[inherit_doc ofSolverAndSM]
-def new (solver : Solver) : (sm : Option SymbolManager := none) → Env InputParser
-  | none => ofSolver solver
-  | some sm => ofSolverAndSM solver sm
-
-end InputParser
 
 namespace Result
 
@@ -656,40 +91,6 @@ extern_def hasNoSolution : SynthResult → Bool
 extern_def isUnknown : SynthResult → Bool
 
 end SynthResult
-
-section ffi_except_constructors
-
-/-- Only used by FFI to inject values. -/
-@[export generic_except_ok]
-private def mkExceptOk {α : Type} : α → Except Error α :=
-  .ok
-
-/-- Only used by FFI to inject values. -/
-@[export except_ok_bool]
-private def mkExceptOkBool : Bool → Except Error Bool :=
-  .ok
-
-/-- Only used by FFI to inject values. -/
-@[export except_ok_u32]
-private def mkExceptOkU32 : UInt32 → Except Error UInt32 :=
-  .ok
-
-/-- Only used by FFI to inject values. -/
-@[export except_ok_u16]
-private def mkExceptOkU16 : UInt16 → Except Error UInt16 :=
-  .ok
-
-/-- Only used by FFI to inject values. -/
-@[export except_ok_u8]
-private def mkExceptOkU8 : UInt8 → Except Error UInt8 :=
-  .ok
-
-/-- Only used by FFI to inject errors. -/
-@[export except_err]
-private def mkExceptErr {α : Type} : String → Except Error α :=
-  .error ∘ Error.error
-
-end ffi_except_constructors
 
 namespace DatatypeConstructorDecl
 
@@ -1346,6 +747,11 @@ protected extern_def hash : Term → UInt64
 
 instance : Hashable Term := ⟨Term.hash⟩
 
+/-- A string representation of this term. -/
+protected extern_def toString : Term → String
+
+instance : ToString Term := ⟨Term.toString⟩
+
 /-- Determine if this term is nullary. -/
 extern_def isNull : Term → Bool
 
@@ -1399,6 +805,12 @@ extern_def!? getBitVectorValue : Term → UInt32 → Except Error String
 /-- Get the native integral value of an integral value. -/
 extern_def!? getIntegerValue : Term → Except Error Int
 
+/-- Get the native integral value of an integral value. -/
+extern_def isStringValue : Term → Bool
+
+/-- Get the native integral value of an integral value. -/
+extern_def!? getStringValue : Term → Except Error String
+
 /-- Get the native rational value of a real, rational-compatible value. -/
 extern_def!? getRationalValue : Term → Except Error Rat
 
@@ -1451,11 +863,6 @@ def getChildren (t : Term) : Array Term := Id.run do
   for ct in t do
     cts := cts.push ct
   cts
-
-/-- A string representation of this term. -/
-protected extern_def toString : Term → String
-
-instance : ToString Term := ⟨Term.toString⟩
 
 end Term
 
@@ -1666,25 +1073,28 @@ extern_def mkTrue : TermManager → Env Term
 /-- Create a Boolean false constant. -/
 extern_def mkFalse : TermManager → Env Term
 
+/-- Create a constant representing the number Pi. -/
+extern_def mkPi : TermManager → Env Term
+
 /-- Create an integer-value term.
 
 - `s`: the string representation of the constant, may represent an integer such as (`"123"`).
 -/
-private extern_def mkIntegerFromString : TermManager → (s : String) → Env Term
+extern_def mkIntegerOfString : TermManager → (s : String) → Env Term
 with
   /-- Create an integer-value term. -/
-  mkInteger (tm : TermManager) : Int → Env Term := mkIntegerFromString tm ∘ toString
+  mkInteger (tm : TermManager) : (i : Int) → Env Term := mkIntegerOfString tm ∘ toString
 
 /-- Create a real-value term.
 
 - `s`: the string representation of the constant, may represent an integer (`"123"`) or a real
   constant (`"12.34"`, `"12/34"`).
 -/
-private extern_def mkRealFromString : TermManager → (s : String) → Env Term
+extern_def mkRealOfString : TermManager → (s : String) → Env Term
 with
   /-- Create a real-value term from a `Rat`. -/
   mkRealOfRat (tm : TermManager) (rat : Rat) : Env Term :=
-    mkRealFromString tm s!"{rat.num}/{rat.den}"
+    mkRealOfString tm s!"{rat.num}/{rat.den}"
   /-- Create a real-value term from numerator/denominator `Int`-s. -/
   mkReal (tm : TermManager)
     (num : Int) (den : Int := 1) (den_ne_0 : den ≠ 0 := by simp <;> omega)
@@ -1730,14 +1140,9 @@ extern_def mkSepNil : TermManager → (sort : cvc5.Sort) → Env Term
 
 /-- Create a string constant from a `String`.
 
-The string may contain SMT-LIB-compatible escape sequences like `\u1234` to encode unicode
-characters.
-
 - `s` The string this constant represents.
-- `useEscSequences` Determines whether escape sequences in `s` should be converted to the
-  corresponding unicode characters, default `false`.
 -/
-extern_def mkString : TermManager → (s : String) → (useEscSequences : Bool := false) → Env Term
+extern_def mkString : TermManager → (s : String) → Env Term
 
 /-- Create an empty sequence of the given element sort.
 
@@ -1972,6 +1377,15 @@ If `args` is empty, the `Op` simply wraps the `cvc5.Kind`. The `Kind` can be use
 extern_def mkOpOfIndices : TermManager → (kind : Kind) → (args : Array Nat := #[]) → Env Op
 with mkOp := @mkOpOfIndices
 
+/--Create operator of kind `Kind.DIVISIBLE` to support arbitrary precision integers.
+
+See `cvc5.Kind` for a description of the parameters.
+
+- `kind` The kind of the operator.
+- `arg` The string argument to this operator.
+-/
+extern_def mkOpOfString : TermManager → (kind : Kind) → (arg : String) → Env Op
+
 /-- Create a datatype constructor declaration.
 
 - `name` The name of the datatype constructor.
@@ -2002,41 +1416,6 @@ The names of the datatype declarations must be distinct.
 extern_def mkDatatypeSorts : TermManager → (dtypeDecls : Array DatatypeDecl) → Env (Array cvc5.Sort)
 
 end TermManager
-
-namespace EnvT
-
-/-- Runs `EnvT` code. -/
-def run [Monad m] [MonadLiftT BaseIO m] (code : EnvT m α) : m (Except Error α) := code
-
-instance [Monad m] [MonadLiftT BaseIO m] : MonadLift Env (EnvT m) where
-  monadLift code := do
-    match ← liftM <| run code with
-    | .ok a => return a
-    | .error e => throw e
-
-instance [Monad m] [MonadLiftT BaseIO m] : MonadLift IO (EnvT m) where
-  monadLift code := do
-    match ← code.toBaseIO with
-    | .ok a => return a
-    | .error e => throw <| Error.error <| toString e
-
-end EnvT
-
-@[inherit_doc EnvT.run]
-protected abbrev run := @EnvT.run
-
-namespace Env
-
-@[inherit_doc EnvT.run]
-def run : Env α → BaseIO (Except Error α) := cvc5.run
-
-/-- Runs `Env` code in the `IO` monad, throws `cvc5.Error`s as `IO.Error`s. -/
-def runIO (code : Env α) : IO α := do
-  match ← code.run with
-  | .ok res => return res
-  | .error e => throw <| IO.Error.userError <| toString e
-
-end Env
 
 namespace Grammar
 
